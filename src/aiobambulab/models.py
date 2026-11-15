@@ -299,7 +299,7 @@ def _fan_speed(value: Any) -> int | None:
     level = _as_int(value)
     if level is None or not 0 <= level <= _MAX_FAN_LEVEL:
         return None
-    return -(-level * 10 // _MAX_FAN_LEVEL) * 10
+    return -(-level * 10 // _MAX_FAN_LEVEL) * 10  # pylint: disable=invalid-unary-operand-type
 
 
 def _print_error(report: dict[str, Any]) -> str | None:
@@ -338,7 +338,7 @@ def _errors(report: dict[str, Any]) -> tuple[PrinterError, ...]:
 def _color(value: Any) -> str | None:
     """Return a color as `RRGGBBAA`, or None if it is not one."""
     color = _as_text(value)
-    if color is None or len(color) != 8:  # noqa: PLR2004
+    if color is None or len(color) != 8:
         return None
     try:
         int(color, 16)
@@ -361,7 +361,7 @@ def _filament(tray: Any) -> Filament | None:
         name=_as_text(tray.get("tray_sub_brands")),
         color=_color(tray.get("tray_color")),
         remaining=(
-            remaining if remaining is not None and 0 <= remaining <= 100 else None  # noqa: PLR2004
+            remaining if remaining is not None and 0 <= remaining <= 100 else None
         ),
         nozzle_temperature_min=_as_int(tray.get("nozzle_temp_min")) or None,
         nozzle_temperature_max=_as_int(tray.get("nozzle_temp_max")) or None,

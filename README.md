@@ -1,6 +1,18 @@
-# aiobambulab
+# Python: Bambu Lab
+
+[![GitHub Release][releases-shield]][releases]
+[![Python Versions][python-versions-shield]][pypi]
+![Project Stage][project-stage-shield]
+![Project Maintenance][maintenance-shield]
+[![License][license-shield]](LICENSE.md)
+
+[![Build Status][build-shield]][build]
+[![Code Coverage][codecov-shield]][codecov]
+[![Code Smells][code-smells]][sonarcloud]
 
 Asynchronous Python client for Bambu Lab 3D printers on the local network.
+
+## About
 
 The client connects to the MQTT server that every Bambu Lab printer runs, and follows what the printer reports: the state of the print job, its progress, temperatures, and more. It does not use the Bambu Lab cloud.
 
@@ -16,11 +28,13 @@ The client connects to the MQTT server that every Bambu Lab printer runs, and fo
 
 ## Installation
 
-```shell
+```bash
 pip install aiobambulab
 ```
 
-## What you need
+## Usage
+
+### What you need
 
 - The IP address of the printer.
 - The serial number of the printer. It is not case sensitive.
@@ -28,7 +42,7 @@ pip install aiobambulab
 
 You find all three on the screen of the printer. The printer does not have to be in LAN only mode.
 
-## Finding printers
+### Finding printers
 
 A printer announces itself on the network every few seconds. `discover()` listens for that, so you do not have to look up the IP address and the serial number:
 
@@ -43,7 +57,7 @@ It returns shortly after the last printer showed up, or after 15 seconds when th
 
 Announcements do not cross routers, so this only finds printers on the same network.
 
-## Usage
+### Connecting
 
 ```python
 import asyncio
@@ -149,12 +163,12 @@ if (url := client.camera_stream_url) is not None:
 
 `connect()` raises one of these, all subclasses of `BambuLabError`:
 
-| Error | Meaning |
-| --- | --- |
-| `BambuLabAuthenticationError` | The printer rejected the access code. |
-| `BambuLabSerialMismatchError` | The printer at this address has another serial number. |
-| `BambuLabCertificateError` | The device at this address has no certificate issued by Bambu Lab. |
-| `BambuLabConnectionError` | The printer could not be reached, or it did not report its state in time. |
+| Error                         | Meaning                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------- |
+| `BambuLabAuthenticationError` | The printer rejected the access code.                                     |
+| `BambuLabSerialMismatchError` | The printer at this address has another serial number.                    |
+| `BambuLabCertificateError`    | The device at this address has no certificate issued by Bambu Lab.        |
+| `BambuLabConnectionError`     | The printer could not be reached, or it did not report its state in time. |
 
 `BambuLabSerialMismatchError` is a `BambuLabCertificateError`, which is a `BambuLabConnectionError`. Catch the specific ones first.
 
@@ -166,20 +180,6 @@ To decide this yourself, pass your own `ssl.SSLContext` as `ssl_context`.
 
 Creating the default context reads files from disk. The client does that in an executor. To create it yourself, for example to reuse it, call `create_ssl_context(serial)` in an executor.
 
-## Development
-
-This project uses [uv](https://docs.astral.sh/uv/).
-
-```shell
-uv sync
-uv run pytest
-uv run ruff check
-uv run ruff format --check
-uv run mypy
-```
-
-The tests run the client against a fake printer: a small MQTT server over TLS, in `tests/fake_printer.py`. Nothing in the tests is mocked between the client and the network.
-
 ## What is not in this library
 
 - Anything that goes through the Bambu Lab cloud.
@@ -188,6 +188,63 @@ The tests run the client against a fake printer: a small MQTT server over TLS, i
 - The second nozzle of a printer with two: temperatures are those of the nozzle in use.
 - What only a few models have, like a laser, a cutter, a door sensor, or an air filter.
 - Updating the firmware.
+
+## Changelog & Releases
+
+This repository keeps a change log using [GitHub's releases][releases]
+functionality. The format of the log is based on
+[Keep a Changelog][keepchangelog].
+
+Releases are based on [Semantic Versioning][semver], and use the format
+of `MAJOR.MINOR.PATCH`. In a nutshell, the version will be incremented
+based on the following:
+
+- `MAJOR`: Incompatible or major changes.
+- `MINOR`: Backwards-compatible new features and enhancements.
+- `PATCH`: Backwards-compatible bugfixes and package updates.
+
+## Contributing
+
+This is an active open-source project. We are always open to people who want to
+use the code or contribute to it.
+
+We've set up a separate document for our
+[contribution guidelines](.github/CONTRIBUTING.md).
+
+Thank you for being involved! :heart_eyes:
+
+## Setting up development environment
+
+This Python project is fully managed using the [uv][uv] dependency manager. But also relies on the use of NodeJS for certain checks during development.
+
+You need at least:
+
+- Python 3.13+
+- [uv][uv-install]
+- NodeJS 12+ (including NPM)
+
+To install all packages, including all development requirements:
+
+```bash
+npm install
+uv sync --all-groups
+```
+
+As this repository uses the [prek][prek] framework, all changes
+are linted and tested with each commit. You can run all checks and tests
+manually, using the following command:
+
+```bash
+uv run prek run --all-files
+```
+
+To run just the Python tests:
+
+```bash
+uv run pytest
+```
+
+The tests run the client against a fake printer: a small MQTT server over TLS, in `tests/fake_printer.py`. Nothing in the tests is mocked between the client and the network.
 
 ## Credits
 
@@ -198,6 +255,54 @@ The protocol of the printers is not documented by Bambu Lab. This library builds
 
 This library is not affiliated with or endorsed by Bambu Lab.
 
+## Authors & contributors
+
+The content is by [Joost Lekkerkerker][joostlek].
+
+For a full list of all authors and contributors,
+check [the contributor's page][contributors].
+
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT License
+
+Copyright (c) 2026 Joost Lekkerkerker
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+[build-shield]: https://github.com/joostlek/python-bambulab/actions/workflows/tests.yaml/badge.svg
+[build]: https://github.com/joostlek/python-bambulab/actions
+[code-smells]: https://sonarcloud.io/api/project_badges/measure?project=joostlek_python-bambulab&metric=code_smells
+[codecov-shield]: https://codecov.io/gh/joostlek/python-bambulab/branch/main/graph/badge.svg
+[codecov]: https://codecov.io/gh/joostlek/python-bambulab
+[contributors]: https://github.com/joostlek/python-bambulab/graphs/contributors
+[joostlek]: https://github.com/joostlek
+[keepchangelog]: http://keepachangelog.com/en/1.0.0/
+[license-shield]: https://img.shields.io/github/license/joostlek/python-bambulab.svg
+[maintenance-shield]: https://img.shields.io/maintenance/yes/2026.svg
+[uv-install]: https://docs.astral.sh/uv/getting-started/installation/
+[uv]: https://docs.astral.sh/uv/
+[prek]: https://prek.j178.dev/
+[project-stage-shield]: https://img.shields.io/badge/project%20stage-beta-yellow.svg
+[python-versions-shield]: https://img.shields.io/pypi/pyversions/aiobambulab
+[releases-shield]: https://img.shields.io/github/release/joostlek/python-bambulab.svg
+[releases]: https://github.com/joostlek/python-bambulab/releases
+[semver]: http://semver.org/spec/v2.0.0.html
+[sonarcloud]: https://sonarcloud.io/summary/new_code?id=joostlek_python-bambulab
+[pypi]: https://pypi.org/project/aiobambulab/

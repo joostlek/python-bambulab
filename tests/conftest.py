@@ -1,5 +1,7 @@
 """Fixtures for the tests of aiobambulab."""
 
+# pylint: disable=protected-access,redefined-outer-name
+
 from __future__ import annotations
 
 from dataclasses import dataclass

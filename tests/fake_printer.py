@@ -200,7 +200,9 @@ class FakePrinter:
         if (change := self._handle_command(request)) is not None:
             self.push({"print": {"command": "push_status", "msg": 1, **change}})
 
-    def _handle_command(self, request: dict[str, Any]) -> dict[str, Any] | None:
+    def _handle_command(  # noqa: PLR0911  # pylint: disable=too-many-return-statements
+        self, request: dict[str, Any]
+    ) -> dict[str, Any] | None:
         """Do what a command asks, and return what changed."""
         system = request.get("system", {})
         if system.get("command") == "ledctrl":

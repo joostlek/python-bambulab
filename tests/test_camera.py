@@ -1,5 +1,7 @@
 """Tests for the camera of a printer, against a fake camera."""
 
+# pylint: disable=protected-access,redefined-outer-name
+
 from __future__ import annotations
 
 import asyncio

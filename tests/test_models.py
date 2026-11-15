@@ -401,7 +401,7 @@ def test_errors() -> None:
 @pytest.mark.parametrize("hms", [None, "none", {"attr": 1, "code": 1}, []])
 def test_no_errors(hms: Any) -> None:
     """A printer without problems has no errors."""
-    assert PrinterState.from_report({"hms": hms}).errors == ()
+    assert PrinterState.from_report({"hms": hms}).errors == ()  # pylint: disable=use-implicit-booleaness-not-comparison
 
 
 AMS_REPORT: dict[str, Any] = {
@@ -536,7 +536,7 @@ def test_no_ams(report: dict[str, Any]) -> None:
     """A printer without an AMS has none."""
     state = PrinterState.from_report(report)
 
-    assert state.ams == ()
+    assert state.ams == ()  # pylint: disable=use-implicit-booleaness-not-comparison
     assert state.external_spool is None
 
 
