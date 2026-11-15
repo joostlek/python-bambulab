@@ -27,10 +27,10 @@ classifiers = [
 dependencies = ["aiomqtt>=2.5.0"]
 
 [project.urls]
-Homepage = "https://github.com/joostlek/aiobambulab"
-Repository = "https://github.com/joostlek/aiobambulab"
-Issues = "https://github.com/joostlek/aiobambulab/issues"
-Changelog = "https://github.com/joostlek/aiobambulab/releases"
+Homepage = "https://github.com/joostlek/python-bambulab"
+Repository = "https://github.com/joostlek/python-bambulab"
+Issues = "https://github.com/joostlek/python-bambulab/issues"
+Changelog = "https://github.com/joostlek/python-bambulab/releases"
 
 [dependency-groups]
 dev = [
