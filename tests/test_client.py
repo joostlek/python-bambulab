@@ -1,5 +1,7 @@
 """Tests for the client of aiobambulab, against a fake printer."""
 
+# pylint: disable=protected-access,redefined-outer-name
+
 from __future__ import annotations
 
 import asyncio
@@ -41,7 +43,7 @@ if TYPE_CHECKING:
 async def wait_for(condition: Callable[[], bool]) -> None:
     """Wait until the condition holds."""
     async with asyncio.timeout(5):
-        while not condition():
+        while not condition():  # noqa: ASYNC110  # polls work done in the background
             await asyncio.sleep(0.01)
 
 
@@ -615,7 +617,7 @@ async def test_unexpected_error_while_connected(
         await wait_for(lambda: not client.available)
 
     assert f"Unexpected error in the connection to printer {SERIAL}" in caplog.text
-    assert type(client.error) is BambuLabError
+    assert type(client.error) is BambuLabError  # pylint: disable=unidiomatic-typecheck
 
     await wait_for(lambda: client.available)
 
@@ -938,7 +940,7 @@ async def test_set_temperatures(printer: FakePrinter, client: BambuLabClient) ->
         (Fan.CHAMBER, 0, "M106 P3 S0\n", "chamber_fan_speed", 0),
     ],
 )
-async def test_set_fan_speed(
+async def test_set_fan_speed(  # noqa: PLR0917
     printer: FakePrinter,
     client: BambuLabClient,
     fan: Fan,

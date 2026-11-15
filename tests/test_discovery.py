@@ -1,5 +1,7 @@
 """Tests for finding printers on the network."""
 
+# pylint: disable=protected-access,redefined-outer-name
+
 from __future__ import annotations
 
 import asyncio

@@ -36,7 +36,7 @@ async def main(host: str, serial: str, access_code: str) -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:  # noqa: PLR2004
+    if len(sys.argv) != 4:
         sys.exit(__doc__)
     with contextlib.suppress(KeyboardInterrupt):
         asyncio.run(main(*sys.argv[1:]))

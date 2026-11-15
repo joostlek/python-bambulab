@@ -168,15 +168,16 @@ Creating the default context reads files from disk. The client does that in an e
 
 ## Development
 
-This project uses [uv](https://docs.astral.sh/uv/).
+This project uses [uv](https://docs.astral.sh/uv/), and Node.js for Prettier.
 
 ```shell
 uv sync
-uv run pytest
-uv run ruff check
-uv run ruff format --check
-uv run mypy
+npm install
+uv run prek install
+uv run prek run --all-files
 ```
+
+`prek run --all-files` runs all checks: Ruff, mypy, pylint, pytest, codespell, yamllint, and Prettier.
 
 The tests run the client against a fake printer: a small MQTT server over TLS, in `tests/fake_printer.py`. Nothing in the tests is mocked between the client and the network.
 
@@ -200,4 +201,4 @@ This library is not affiliated with or endorsed by Bambu Lab.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE.md](LICENSE.md).

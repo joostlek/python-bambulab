@@ -120,7 +120,7 @@ def _merge(target: dict[str, Any], update: dict[str, Any]) -> None:
             target[key] = value
 
 
-class BambuLabClient:
+class BambuLabClient:  # pylint: disable=too-many-public-methods
     """Client that follows a Bambu Lab printer on the local network.
 
     The printer pushes its status over MQTT. The client keeps the connection
@@ -384,7 +384,7 @@ class BambuLabClient:
 
     async def set_fan_speed(self, fan: Fan, percentage: int) -> None:
         """Set the speed of a fan, as a percentage."""
-        if not 0 <= percentage <= 100:  # noqa: PLR2004
+        if not 0 <= percentage <= 100:
             msg = f"The speed of a fan is from 0 to 100, not {percentage}"
             raise ValueError(msg)
         speed = round(255 * percentage / 100)
@@ -484,7 +484,7 @@ class BambuLabClient:
                     error = _convert_error(err)
                 except BambuLabError as err:
                     error = err
-                except Exception:
+                except Exception:  # pylint: disable=broad-exception-caught
                     # A bug must not end the connection for good.
                     _LOGGER.exception(
                         "Unexpected error in the connection to printer %s",
@@ -611,6 +611,6 @@ class BambuLabClient:
         for listener in list(self._listeners):
             try:
                 listener()
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 # A listener that fails must not end the connection.
                 _LOGGER.exception("Error in a listener of printer %s", self._serial)

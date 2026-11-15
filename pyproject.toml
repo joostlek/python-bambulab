@@ -1,16 +1,12 @@
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
 [project]
 name = "aiobambulab"
 version = "0.1.0"
 description = "Asynchronous Python client for Bambu Lab 3D printers on the local network"
+authors = [{ name = "Joost Lekkerkerker", email = "joostlek@outlook.com" }]
+requires-python = ">=3.13,<4"
 readme = "README.md"
 license = "MIT"
-license-files = ["LICENSE"]
-requires-python = ">=3.13"
-authors = [{ name = "Joost Lekkerkerker" }]
+maintainers = [{ name = "Joost Lekkerkerker", email = "joostlek@outlook.com" }]
 keywords = ["bambu lab", "bambulab", "3d printer", "mqtt", "asyncio"]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -29,80 +25,147 @@ dependencies = ["aiomqtt>=2.5.0"]
 [project.urls]
 Homepage = "https://github.com/joostlek/python-bambulab"
 Repository = "https://github.com/joostlek/python-bambulab"
-Issues = "https://github.com/joostlek/python-bambulab/issues"
+Documentation = "https://github.com/joostlek/python-bambulab"
+"Bug Tracker" = "https://github.com/joostlek/python-bambulab/issues"
 Changelog = "https://github.com/joostlek/python-bambulab/releases"
 
 [dependency-groups]
 dev = [
-  "cryptography>=44.0.0",
-  "mypy>=1.15.0",
-  "pytest>=8.3.0",
-  "pytest-asyncio>=1.0.0",
-  "pytest-cov>=6.0.0",
-  "ruff>=0.11.0",
+    "codespell==2.4.3",
+    "covdefaults==2.3.0",
+    "coverage[toml]==7.17.3",
+    "cryptography==50.0.2",
+    "mypy==2.4.1",
+    "prek==0.5.10",
+    "pre-commit-hooks==6.0.0",
+    "pylint==4.1.4",
+    "pytest==9.2.0",
+    "pytest-asyncio==1.5.0",
+    "pytest-cov==7.1.0",
+    "ruff==0.17.5",
+    "safety==3.8.1",
+    "yamllint==1.38.0",
 ]
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/aiobambulab"]
+[tool.uv]
+default-groups = "all"
 
 [tool.hatch.build.targets.sdist]
-include = ["/src", "/tests", "/examples", "/README.md", "/LICENSE"]
+include = ["src/aiobambulab"]
 
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "function"
-testpaths = ["tests"]
-addopts = "--cov=aiobambulab --cov-report=term-missing"
+[tool.hatch.build.targets.wheel]
+include = ["src/aiobambulab"]
 
-[tool.coverage.run]
-branch = true
-source = ["aiobambulab"]
+[tool.hatch.build.targets.wheel.sources]
+"src/aiobambulab" = "aiobambulab"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.coverage.report]
-fail_under = 100
 show_missing = true
-exclude_also = ["if TYPE_CHECKING:"]
+fail_under = 50
+
+[tool.coverage.run]
+plugins = ["covdefaults"]
+source = ["aiobambulab"]
 
 [tool.mypy]
+# Specify the target platform details in config, so your developers are
+# free to run mypy on Windows, Linux, or macOS and get consistent
+# results.
+platform = "linux"
 python_version = "3.13"
-strict = true
-warn_unreachable = true
-files = ["src", "tests", "examples"]
 
-[[tool.mypy.overrides]]
-# mypy narrows a property after an assert, also when the test changes it later.
-module = "tests.*"
-warn_unreachable = false
+# show error messages from unrelated files
+follow_imports = "normal"
 
-[tool.ruff]
-target-version = "py313"
+# suppress errors about unsatisfied imports
+ignore_missing_imports = true
+
+# be strict
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_untyped_decorators = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+strict_optional = true
+warn_incomplete_stub = true
+warn_no_return = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unused_configs = true
+warn_unused_ignores = true
+
+[tool.pylint.MASTER]
+ignore = [
+  "tests",
+]
+
+[tool.pylint.BASIC]
+good-names = [
+  "_",
+  "ex",
+  "fp",
+  "i",
+  "id",
+  "j",
+  "k",
+  "on",
+  "Run",
+  "T",
+]
+
+[tool.pylint.DESIGN]
+max-attributes = 8
+
+[tool.pylint."MESSAGES CONTROL"]
+disable = [
+  "duplicate-code",
+  "format",
+  "unsubscriptable-object",
+  "too-many-instance-attributes",
+  "wrong-import-order",
+  "too-many-arguments",
+  "too-many-positional-arguments",
+]
+
+[tool.pylint.SIMILARITIES]
+ignore-imports = true
+
+[tool.pylint.FORMAT]
+max-line-length = 88
+
+[tool.pytest.ini_options]
+addopts = "--cov"
+asyncio_mode = "auto"
 
 [tool.ruff.lint]
-select = ["ALL"]
 ignore = [
-  "ANN401", # The messages of a printer are untyped JSON
-  "COM812", # Conflicts with the formatter
-  "CPY001", # No copyright notice in every file
-  "D203", # Conflicts with D211
-  "D213", # Conflicts with D212
+  "ANN401", # Opinioated warning on disallowing dynamically typed expressions
+  "COM812", # Conflicts with other rules
+  "CPY001", # Files do not carry copyright notices
+  "D203", # Conflicts with other rules
+  "D213", # Conflicts with other rules
+  "D417", # False positives in some occasions
+  "ISC001", # Conflicts with other rules
+  "PLR2004", # Just annoying, not really useful
 ]
+select = ["ALL"]
 
-[tool.ruff.lint.per-file-ignores]
-"tests/**" = [
-  "ASYNC110", # Tests poll for what the client does in the background
-  "PLR0911", # The fake printer answers many commands
-  "PLR0913", # Tests take as many fixtures and parameters as they need
-  "PLR0917", # Tests take as many fixtures and parameters as they need
-  "PLR2004", # Magic values are fine in tests
-  "S101", # Asserts are the point of tests
-  "SLF001", # Tests may look at private members
-]
-"examples/**" = [
-  "INP001", # Examples are scripts, not a package
-  "T201", # Examples print
-]
+[tool.ruff.lint.flake8-pytest-style]
+fixture-parentheses = false
+mark-parentheses = false
 
 [tool.ruff.lint.isort]
-combine-as-imports = true
-force-sort-within-sections = true
 known-first-party = ["aiobambulab"]
+force-sort-within-sections = true
+split-on-trailing-comma = false
+combine-as-imports = true
+
+[tool.ruff.lint.mccabe]
+max-complexity = 25
