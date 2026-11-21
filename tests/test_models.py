@@ -2,21 +2,31 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 
 import pytest
 
 from aiobambulab import (
     Ams,
+    AmsInfo,
+    AmsModel,
     AmsTray,
     ErrorSeverity,
+    ExternalSpool,
+    Extruder,
+    ExtruderPosition,
     Filament,
+    FilamentSource,
+    Nozzle,
     PrinterError,
     PrinterInfo,
     PrinterModel,
     PrinterState,
     PrintStage,
     PrintState,
+    RackSlot,
+    RackSlotState,
     SpeedProfile,
 )
 
@@ -43,8 +53,6 @@ def test_state_of_an_idle_printer() -> None:
         remaining_minutes=0,
         current_layer=0,
         total_layers=0,
-        nozzle_temperature=25,
-        nozzle_target_temperature=0,
         bed_temperature=24,
         bed_target_temperature=0,
         chamber_temperature=26,
@@ -53,7 +61,15 @@ def test_state_of_an_idle_printer() -> None:
         wifi_signal=-45,
         stage=PrintStage.IDLE,
         speed_percentage=100,
-        nozzle_diameter=0.4,
+        extruders=(
+            Extruder(
+                position=ExtruderPosition.RIGHT,
+                temperature=25,
+                target_temperature=0,
+                active=True,
+                nozzle=Nozzle(diameter=0.4),
+            ),
+        ),
     )
 
 
@@ -68,9 +84,7 @@ def test_state_of_a_printer_without_chamber_sensor() -> None:
         remaining_minutes=73,
         current_layer=96,
         total_layers=240,
-        # The printer reports 219.90625 and 59.6875.
-        nozzle_temperature=220,
-        nozzle_target_temperature=220,
+        # The printer reports 59.6875.
         bed_temperature=60,
         bed_target_temperature=60,
         chamber_temperature=None,
@@ -79,8 +93,16 @@ def test_state_of_a_printer_without_chamber_sensor() -> None:
         wifi_signal=-58,
         stage=PrintStage.PRINTING,
         speed_percentage=124,
-        nozzle_diameter=0.4,
-        nozzle_type="stainless_steel",
+        extruders=(
+            Extruder(
+                position=ExtruderPosition.RIGHT,
+                # The printer reports 219.90625.
+                temperature=220,
+                target_temperature=220,
+                active=True,
+                nozzle=Nozzle(diameter=0.4, type="stainless_steel"),
+            ),
+        ),
     )
 
 
@@ -90,7 +112,6 @@ def test_state_of_a_printer_that_reports_the_chamber_as_a_device() -> None:
 
     assert state.print_state is PrintState.PAUSED
     assert state.chamber_temperature == 35
-    assert state.nozzle_temperature == 245
     assert state.chamber_light_on is True
 
 
@@ -180,6 +201,15 @@ def test_info_of_a_printer_without_a_mainboard_module() -> None:
         model_name="H2D",
         firmware_version="01.01.01.00",
         hardware_version=None,
+        ams=(
+            AmsInfo(
+                id=0,
+                model=AmsModel.AMS_2_PRO,
+                serial="19C00A000000001",
+                firmware_version="02.00.19.47",
+                hardware_version="N3F05",
+            ),
+        ),
     )
 
 
@@ -484,8 +514,13 @@ def test_ams() -> None:
         ),
         Ams(id=1),
     )
-    assert state.external_spool == Filament(type="TPU", color="00112233", remaining=0)
-    assert not state.external_spool_active
+    assert state.external_spools == (
+        ExternalSpool(
+            extruder=ExtruderPosition.RIGHT,
+            # Nothing tells what remains of a spool without a tag.
+            filament=Filament(type="TPU", color="00112233"),
+        ),
+    )
 
 
 @pytest.mark.parametrize(
@@ -518,14 +553,15 @@ def test_active_tray(
                     {"id": "128", "tray": trays[:1]},
                 ],
                 "tray_now": tray_now,
-            }
+            },
+            "vt_tray": {"id": "254", "tray_type": "PLA"},
         }
     )
 
     assert {
         (unit.id, tray.id) for unit in state.ams for tray in unit.trays if tray.active
     } == active
-    assert state.external_spool_active is external_spool_active
+    assert [spool.active for spool in state.external_spools] == [external_spool_active]
 
 
 @pytest.mark.parametrize(
@@ -537,7 +573,7 @@ def test_no_ams(report: dict[str, Any]) -> None:
     state = PrinterState.from_report(report)
 
     assert state.ams == ()  # pylint: disable=use-implicit-booleaness-not-comparison
-    assert state.external_spool is None
+    assert state.external_spools == ()  # pylint: disable=use-implicit-booleaness-not-comparison
 
 
 @pytest.mark.parametrize(
@@ -553,9 +589,7 @@ def test_no_ams(report: dict[str, Any]) -> None:
         ({"sdcard": False}, PrinterState(sd_card_present=False)),
         ({"sdcard": "yes"}, PrinterState()),
         ({"spd_mag": 124}, PrinterState(speed_percentage=124)),
-        ({"nozzle_diameter": "0.6"}, PrinterState(nozzle_diameter=0.6)),
         ({"nozzle_diameter": "0"}, PrinterState()),
-        ({"nozzle_type": "hardened_steel"}, PrinterState(nozzle_type="hardened_steel")),
         (
             {"upgrade_state": {"ota_new_version_number": "01.09.00.00"}},
             PrinterState(available_firmware_version="01.09.00.00"),
@@ -606,4 +640,451 @@ def test_filament_color(color: Any, expected: str | None) -> None:
         {"vt_tray": {"tray_type": "PLA", "tray_color": color}}
     )
 
-    assert state.external_spool == Filament(type="PLA", color=expected)
+    assert state.external_spools[0].filament == Filament(type="PLA", color=expected)
+
+
+H2C_NOZZLE = Nozzle(
+    diameter=0.4,
+    type="HS01",
+    serial="20D00A000000001",
+    print_time=timedelta(seconds=257323),
+)
+
+
+def _rack_nozzle(number: int, seconds: int) -> Nozzle:
+    return Nozzle(
+        diameter=0.4,
+        type="HS01",
+        serial=f"20D00A00000000{number}",
+        print_time=timedelta(seconds=seconds),
+    )
+
+
+def test_extruders_of_a_printer_with_a_nozzle_rack() -> None:
+    """An H2C has two extruders, and a rack with the nozzles of the right one."""
+    state = PrinterState.from_report(_report("h2c_status.json"), PrinterModel.H2C)
+
+    assert state.extruders == (
+        Extruder(
+            position=ExtruderPosition.RIGHT,
+            temperature=27,
+            target_temperature=0,
+            active=True,
+            nozzle=H2C_NOZZLE,
+        ),
+        Extruder(
+            position=ExtruderPosition.LEFT,
+            temperature=23,
+            target_temperature=0,
+            # The nozzle of the left extruder stays where it is.
+            nozzle=Nozzle(diameter=0.4, type="HS01"),
+        ),
+    )
+    assert state.nozzle_rack == (
+        RackSlot(number=1, state=RackSlotState.DOCKED, nozzle=_rack_nozzle(3, 499837)),
+        RackSlot(number=2, state=RackSlotState.DOCKED, nozzle=_rack_nozzle(6, 77918)),
+        RackSlot(number=3, state=RackSlotState.DOCKED, nozzle=_rack_nozzle(2, 249280)),
+        RackSlot(number=4, state=RackSlotState.DOCKED, nozzle=_rack_nozzle(5, 149157)),
+        RackSlot(number=5, state=RackSlotState.DOCKED, nozzle=_rack_nozzle(4, 40696)),
+        RackSlot(number=6, state=RackSlotState.MOUNTED, nozzle=H2C_NOZZLE),
+    )
+    assert state.external_spools == (
+        ExternalSpool(extruder=ExtruderPosition.RIGHT),
+        ExternalSpool(extruder=ExtruderPosition.LEFT),
+    )
+    # Each unit can feed both extruders, through the filament switch.
+    assert [
+        (unit.id, unit.model, unit.extruder, len(unit.trays)) for unit in state.ams
+    ] == [
+        (0, AmsModel.AMS_2_PRO, None, 4),
+        (1, AmsModel.AMS_2_PRO, None, 4),
+        (128, AmsModel.AMS_HT, None, 1),
+    ]
+
+
+def test_extruder_of_a_printer_without_a_nozzle_rack() -> None:
+    """A P2S reports its one extruder the way a printer with two does."""
+    state = PrinterState.from_report(_report("p2s_status.json"), PrinterModel.P2S)
+    filament = Filament(
+        type="PLA",
+        color="FFFFFFFF",
+        nozzle_temperature_min=190,
+        nozzle_temperature_max=240,
+    )
+
+    assert state.extruders == (
+        Extruder(
+            position=ExtruderPosition.RIGHT,
+            temperature=15,
+            target_temperature=0,
+            active=True,
+            nozzle=Nozzle(diameter=0.4, type="HS01"),
+        ),
+    )
+    assert state.nozzle_rack == ()  # pylint: disable=use-implicit-booleaness-not-comparison
+    assert state.external_spools == (
+        ExternalSpool(extruder=ExtruderPosition.RIGHT, filament=filament),
+    )
+    assert [(unit.model, unit.extruder) for unit in state.ams] == [
+        (AmsModel.AMS_2_PRO, ExtruderPosition.RIGHT)
+    ]
+
+
+def test_extruders_that_only_report_their_temperature() -> None:
+    """The temperature of an extruder and its target come as one number."""
+    state = PrinterState.from_report(_report("h2d_status.json"), PrinterModel.H2D)
+
+    assert state.extruders == (
+        Extruder(
+            position=ExtruderPosition.RIGHT,
+            temperature=245,
+            target_temperature=245,
+            active=True,
+        ),
+        Extruder(position=ExtruderPosition.LEFT, temperature=47, target_temperature=0),
+    )
+    assert state.nozzle_rack == ()  # pylint: disable=use-implicit-booleaness-not-comparison
+
+
+@pytest.mark.parametrize(
+    ("report", "extruders"),
+    [
+        (
+            {"nozzle_temper": 219.9, "nozzle_target_temper": 220},
+            (
+                Extruder(
+                    position=ExtruderPosition.RIGHT,
+                    temperature=220,
+                    target_temperature=220,
+                    active=True,
+                ),
+            ),
+        ),
+        (
+            {"nozzle_diameter": "0.6", "nozzle_type": "hardened_steel"},
+            (
+                Extruder(
+                    position=ExtruderPosition.RIGHT,
+                    active=True,
+                    nozzle=Nozzle(diameter=0.6, type="hardened_steel"),
+                ),
+            ),
+        ),
+        (
+            {"nozzle_temper": 30, "ams": {"tray_now": "6"}},
+            (
+                Extruder(
+                    position=ExtruderPosition.RIGHT,
+                    temperature=30,
+                    active=True,
+                    filament_source=FilamentSource(ams_id=1, tray_id=2),
+                ),
+            ),
+        ),
+        (
+            {"nozzle_temper": 30, "ams": {"tray_now": "254"}},
+            (
+                Extruder(
+                    position=ExtruderPosition.RIGHT,
+                    temperature=30,
+                    active=True,
+                    filament_source=FilamentSource(
+                        external_spool=ExtruderPosition.RIGHT
+                    ),
+                ),
+            ),
+        ),
+        ({"nozzle_temper": "hot", "device": {"extruder": {"info": "none"}}}, ()),
+        ({"device": {"extruder": {"info": [{"id": 7, "temp": 20}, "broken"]}}}, ()),
+        (
+            {"device": {"extruder": {"info": [{"id": 0, "temp": -1}], "state": "?"}}},
+            (Extruder(position=ExtruderPosition.RIGHT, active=True),),
+        ),
+    ],
+)
+def test_extruder_of_a_printer_that_only_reports_its_nozzle(
+    report: dict[str, Any], extruders: tuple[Extruder, ...]
+) -> None:
+    """A printer that does not report its extruders has one."""
+    assert PrinterState.from_report(report).extruders == extruders
+
+
+@pytest.mark.parametrize(
+    ("state", "active"),
+    [
+        (0x02, [True, False]),
+        (0x12, [False, True]),
+        # The printer switches from one extruder to the other.
+        (0xF2, [False, False]),
+    ],
+)
+def test_active_extruder(state: int, active: list[bool]) -> None:
+    """The printer tells which extruder prints."""
+    report = {"device": {"extruder": {"info": [{"id": 1}, {"id": 0}], "state": state}}}
+
+    extruders = PrinterState.from_report(report).extruders
+
+    assert [extruder.position for extruder in extruders] == list(ExtruderPosition)
+    assert [extruder.active for extruder in extruders] == active
+
+
+@pytest.mark.parametrize(
+    ("snow", "source"),
+    [
+        (0x0103, FilamentSource(ams_id=1, tray_id=3)),
+        (0x8000, FilamentSource(ams_id=128, tray_id=0)),
+        (0xFF00, FilamentSource(external_spool=ExtruderPosition.RIGHT)),
+        (0xFE00, FilamentSource(external_spool=ExtruderPosition.LEFT)),
+        (0xFFFF, None),
+        (0xFEFF, None),
+        (-1, None),
+        ("loaded", None),
+    ],
+)
+def test_filament_source(snow: Any, source: FilamentSource | None) -> None:
+    """An extruder tells where its filament comes from."""
+    state = PrinterState.from_report(
+        {"device": {"extruder": {"info": [{"id": 0, "snow": snow}], "state": 1}}}
+    )
+
+    assert state.extruders[0].filament_source == source
+
+
+def test_active_tray_of_a_printer_with_two_extruders() -> None:
+    """The active tray is the one of the extruder that prints."""
+    trays = [{"id": str(tray), "tray_type": "PLA"} for tray in range(4)]
+    state = PrinterState.from_report(
+        {
+            "ams": {
+                "ams": [{"id": "0", "tray": trays}, {"id": "1", "tray": trays}],
+                # Not what a printer that reports its extruders prints from.
+                "tray_now": "0",
+            },
+            "device": {
+                "extruder": {
+                    "info": [{"id": 0, "snow": 0x0002}, {"id": 1, "snow": 0x0103}],
+                    "state": 0x12,
+                }
+            },
+        }
+    )
+
+    assert {
+        (unit.id, tray.id) for unit in state.ams for tray in unit.trays if tray.active
+    } == {(1, 3)}
+
+
+def test_active_external_spool() -> None:
+    """An external spool is active when its extruder prints from it."""
+    state = PrinterState.from_report(
+        {
+            "vir_slot": [
+                {"id": "254", "tray_type": "PETG"},
+                {"id": "255", "tray_type": "PLA"},
+                {"id": "7", "tray_type": "ABS"},
+                "broken",
+            ],
+            "device": {
+                "extruder": {
+                    "info": [{"id": 0, "snow": 0x0002}, {"id": 1, "snow": 0xFE00}],
+                    "state": 0x12,
+                }
+            },
+        }
+    )
+
+    assert state.external_spools == (
+        ExternalSpool(extruder=ExtruderPosition.RIGHT, filament=Filament(type="PLA")),
+        ExternalSpool(
+            extruder=ExtruderPosition.LEFT, filament=Filament(type="PETG"), active=True
+        ),
+    )
+
+
+def _rack_report(nozzle: Any, holder: Any = None) -> dict[str, Any]:
+    return {"device": {"holder": holder, "nozzle": nozzle}}
+
+
+@pytest.mark.parametrize(
+    ("report", "states"),
+    [
+        (
+            # The nozzle of slot 2 is on the extruder, slot 3 lost its nozzle.
+            _rack_report(
+                {
+                    "exist": 0b1_0001_0000_0000_0000_0001,
+                    "info": [
+                        {"id": 0, "sn": "A"},
+                        {"id": 16, "sn": "B"},
+                        {"id": 18, "sn": "C"},
+                        {"id": 20, "sn": "D"},
+                        {"id": -1},
+                        {"id": "x"},
+                        "broken",
+                    ],
+                    "tar_id": 17,
+                }
+            ),
+            ["docked", "mounted", "empty", "empty", "docked", "empty"],
+        ),
+        (
+            # The slot the nozzle goes back to is only known with that nozzle.
+            _rack_report({"exist": 0, "info": [], "tar_id": 17}, {"pos": 3}),
+            ["empty"] * 6,
+        ),
+        (
+            # A fixed nozzle does not come from the rack.
+            _rack_report({"info": [{"id": 0, "sn": "N/A"}], "tar_id": 16}, {}),
+            ["empty"] * 6,
+        ),
+        (
+            _rack_report({"info": [{"id": 24, "sn": "B"}]}),
+            ["empty"] * 8 + ["docked"],
+        ),
+        (
+            # A printer with nine tools tells where each one belongs. That is
+            # not read: the slot of the tool on the toolhead shows as empty.
+            _rack_report(
+                {
+                    "exist": 0b1_1111_0111_0000_0000_0000_0001,
+                    "info": [
+                        {"id": 0, "addr_id": 3, "sn": "D"},
+                        *(
+                            {"id": 16 + slot, "addr_id": slot, "sn": "T"}
+                            for slot in (0, 1, 2, 4, 5, 6, 7, 8)
+                        ),
+                    ],
+                }
+            ),
+            ["docked"] * 3 + ["empty"] + ["docked"] * 5,
+        ),
+        (_rack_report({"exist": 1, "info": [{"id": 0}], "tar_id": 0}), []),
+        (_rack_report("none"), []),
+        ({"device": {"nozzle": {"info": "none"}}}, []),
+    ],
+)
+def test_nozzle_rack(report: dict[str, Any], states: list[str]) -> None:
+    """A slot of the rack holds its nozzle, lent it to the extruder, or is empty."""
+    rack = PrinterState.from_report(report).nozzle_rack
+
+    assert [slot.number for slot in rack] == list(range(1, len(states) + 1))
+    assert [slot.state for slot in rack] == states
+    assert all((slot.nozzle is None) == (slot.state == "empty") for slot in rack)
+
+
+@pytest.mark.parametrize(
+    ("entry", "nozzle"),
+    [
+        (
+            {"diameter": 0.6, "type": "HH01", "sn": "20D00A000000009", "p_t": 90},
+            Nozzle(
+                diameter=0.6,
+                type="HH01",
+                serial="20D00A000000009",
+                print_time=timedelta(seconds=90),
+            ),
+        ),
+        (
+            {"sn": "20D00A000000009", "p_t": 0},
+            Nozzle(serial="20D00A000000009", print_time=timedelta()),
+        ),
+        ({"sn": "20D00A000000009", "p_t": -1}, Nozzle(serial="20D00A000000009")),
+        ({"diameter": 0, "type": "", "sn": "N/A", "p_t": 0}, Nozzle()),
+        ({"sn": "N/A", "p_t": 500}, Nozzle()),
+    ],
+)
+def test_nozzle(entry: dict[str, Any], nozzle: Nozzle) -> None:
+    """Only a nozzle with a serial number has a time that it printed for."""
+    state = PrinterState.from_report(
+        {
+            "device": {
+                "extruder": {"info": [{"id": 0, "hnow": 0}], "state": 1},
+                "nozzle": {"exist": 1, "info": [{"id": 0, **entry}]},
+            }
+        }
+    )
+
+    assert state.extruders[0].nozzle == nozzle
+
+
+@pytest.mark.parametrize(
+    ("unit", "expected"),
+    [
+        ({"info": "10001E03"}, Ams(id=0, model=AmsModel.AMS_2_PRO)),
+        ({"info": "11002E04"}, Ams(id=0, model=AmsModel.AMS_HT)),
+        (
+            {"info": "1001"},
+            Ams(id=0, model=AmsModel.AMS, extruder=ExtruderPosition.RIGHT),
+        ),
+        (
+            {"info": "2102"},
+            Ams(id=0, model=AmsModel.AMS_LITE, extruder=ExtruderPosition.LEFT),
+        ),
+        ({"info": "1E09"}, Ams(id=0)),
+        ({"info": "none"}, Ams(id=0)),
+        ({"info": 3}, Ams(id=0)),
+        ({"dry_time": 90}, Ams(id=0, drying_remaining_minutes=90)),
+        ({"dry_time": 0}, Ams(id=0, drying_remaining_minutes=0)),
+        ({"dry_time": -1}, Ams(id=0)),
+    ],
+)
+def test_ams_kind_and_drying(unit: dict[str, Any], expected: Ams) -> None:
+    """An AMS tells its kind, its extruder, and how long it still dries filament."""
+    state = PrinterState.from_report({"ams": {"ams": [{"id": "0", **unit}]}})
+
+    assert state.ams == (expected,)
+
+
+def test_info_of_the_ams_units() -> None:
+    """The printer reports each AMS as a module, with a name that tells its kind."""
+    info = PrinterInfo.from_modules(
+        SERIAL,
+        [
+            {"name": "n3s/128", "sw_ver": "03.00.00.10", "hw_ver": "N3S05", "sn": "B"},
+            {"name": "ams_f1/1", "sw_ver": "", "hw_ver": "AMS_F102", "sn": ""},
+            {"name": "ams/0", "sw_ver": "00.00.06.49", "hw_ver": "AMS08", "sn": "A"},
+            {"name": "ams/first"},
+            {"name": "mc", "sn": "C"},
+            {"sn": "D"},
+        ],
+    )
+
+    assert info.ams == (
+        AmsInfo(
+            id=0,
+            model=AmsModel.AMS,
+            serial="A",
+            firmware_version="00.00.06.49",
+            hardware_version="AMS08",
+        ),
+        AmsInfo(id=1, model=AmsModel.AMS_LITE, hardware_version="AMS_F102"),
+        AmsInfo(
+            id=128,
+            model=AmsModel.AMS_HT,
+            serial="B",
+            firmware_version="03.00.00.10",
+            hardware_version="N3S05",
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("tray", "remaining"),
+    [
+        ({"remain": 0}, None),
+        ({"remain": 0, "tag_uid": "0000000000000000", "tray_uuid": "00"}, None),
+        ({"remain": 40, "tag_uid": "A1B2C3D400000100"}, 40),
+        ({"remain": 40, "tray_uuid": "00000000000000000000000000000001"}, 40),
+    ],
+)
+@pytest.mark.parametrize("key", ["vt_tray", "vir_slot"])
+def test_remaining_of_an_external_spool(
+    key: str, tray: dict[str, Any], remaining: int | None
+) -> None:
+    """Only a tag tells what remains of an external spool."""
+    spool = {"id": "255", "tray_type": "PLA", **tray}
+    state = PrinterState.from_report({key: spool if key == "vt_tray" else [spool]})
+
+    assert state.external_spools[0].filament == Filament(
+        type="PLA", remaining=remaining
+    )

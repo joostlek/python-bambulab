@@ -100,14 +100,17 @@ asyncio.run(main())
 - `part_fan_speed`, `aux_fan_speed`, `chamber_fan_speed`, and `heatbreak_fan_speed`: the speed of each fan, as a percentage.
 - `print_error`: the code of what went wrong with the print job, like `0700_8006`.
 - `errors`: the problems the printer reports, each with the code that Bambu Lab calls an HMS code, and a severity.
-- `ams`: the AMS units, each with its humidity, its temperature, and its trays. A tray has the `Filament` that is in it, with its type, name, color, and what remains of it. `active` tells which tray the printer prints from.
-- `external_spool` and `external_spool_active`: the same for the spool that is not in an AMS.
-- `nozzle_diameter` and `nozzle_type`.
+- `extruders`: one or two, the right one first. Each has its temperature and the temperature it is set to, the `Nozzle` that is on it, whether it is the one that prints, and the tray or external spool its filament comes from.
+- `nozzle_rack`: the slots of the rack of a printer that changes nozzles, and nothing for other printers. A slot is docked, mounted, or empty, and keeps its nozzle while that one is on the extruder. A nozzle from the rack has a serial number and the time it printed for.
+- `ams`: the AMS units, each with its kind, the extruder it feeds, its humidity, its temperature, how long it still dries its filament, and its trays. A tray has the `Filament` that is in it, with its type, name, color, and what remains of it. `active` tells which tray the printer prints from.
+- `external_spools`: the spools that are not in an AMS, one for each extruder, with the same as a tray. What remains is only known for a spool with a tag.
 - `timelapse_enabled` and `recording_enabled`: what the camera does during a print job.
 - `sd_card_present`.
 - `available_firmware_version`: the version the printer can update to, if there is one.
 
 The texts that go with the codes of errors are not part of this library. Bambu Lab publishes them.
+
+`client.info.ams` has what each AMS is: its kind, its serial number, and its versions.
 
 ### Commands
 
@@ -180,12 +183,31 @@ To decide this yourself, pass your own `ssl.SSLContext` as `ssl_context`.
 
 Creating the default context reads files from disk. The client does that in an executor. To create it yourself, for example to reuse it, call `create_ssl_context(serial)` in an executor.
 
+### Command line
+
+The `aiobambulab` command shows a printer the way the library sees it. It is there to check the library against a real printer, and it only asks the printer for its version and its status.
+
+```bash
+pip install "aiobambulab[cli]"
+```
+
+It reads `BAMBULAB_HOST`, `BAMBULAB_SERIAL`, and `BAMBULAB_ACCESS_CODE` from the environment, or from a `.env` file in the current directory. `--env-file` picks another file, for a second printer.
+
+```bash
+aiobambulab show
+aiobambulab show --watch
+aiobambulab dump -o printer.json
+aiobambulab show --file printer.json
+```
+
+`show` prints the printer, its extruders and their nozzles, the nozzle rack, the AMS units, and the external spools. With `--watch` it keeps doing that as the printer changes. `dump` writes what the printer reports as JSON, with serial numbers and the ids of spools replaced, so that it can be shared. It keeps the names of print jobs. Both take `--file` to read such a file instead of asking a printer.
+
 ## What is not in this library
 
 - Anything that goes through the Bambu Lab cloud.
 - Starting a print job, and everything else that needs the files on the printer: uploading, the cover image of a print job, and downloading a timelapse.
 - Loading and unloading filament, and drying it in an AMS.
-- The second nozzle of a printer with two: temperatures are those of the nozzle in use.
+- Setting the temperature of one extruder of a printer with two, and switching nozzles.
 - What only a few models have, like a laser, a cutter, a door sensor, or an air filter.
 - Updating the firmware.
 

@@ -922,7 +922,7 @@ async def test_set_temperatures(printer: FakePrinter, client: BambuLabClient) ->
     await client.connect()
 
     await client.set_nozzle_temperature(215)
-    await wait_for(lambda: client.state.nozzle_target_temperature == 215)
+    await wait_for(lambda: client.state.extruders[0].target_temperature == 215)
     await client.set_bed_temperature(0)
     await wait_for(lambda: client.state.bed_target_temperature == 0)
 
