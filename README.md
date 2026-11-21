@@ -104,7 +104,6 @@ asyncio.run(main())
 - `nozzle_rack`: the slots of the rack of a printer that changes nozzles, and nothing for other printers. A slot is docked, mounted, or empty, and keeps its nozzle while that one is on the extruder. A nozzle from the rack has a serial number and the time it printed for.
 - `ams`: the AMS units, each with its kind, the extruder it feeds, its humidity, its temperature, how long it still dries its filament, and its trays. A tray has the `Filament` that is in it, with its type, name, color, and what remains of it. `active` tells which tray the printer prints from.
 - `external_spools`: the spools that are not in an AMS, one for each extruder, with the same as a tray. What remains is only known for a spool with a tag.
-- `external_spool` and `external_spool_active`: those of the first external spool.
 - `timelapse_enabled` and `recording_enabled`: what the camera does during a print job.
 - `sd_card_present`.
 - `available_firmware_version`: the version the printer can update to, if there is one.
