@@ -1,0 +1,335 @@
+{
+  "print": {
+    "command": "push_status",
+    "msg": 0,
+    "sequence_id": "1",
+    "ams": {
+      "ams": [
+        {
+          "dry_setting": {
+            "dry_duration": -1,
+            "dry_filament": "",
+            "dry_temperature": -1
+          },
+          "dry_sf_reason": [],
+          "dry_time": 0,
+          "humidity": "3",
+          "humidity_raw": "34",
+          "id": "0",
+          "info": "10002003",
+          "temp": "19.2",
+          "tray": [
+            {
+              "bed_temp": "0",
+              "bed_temp_type": "0",
+              "cali_idx": -1,
+              "cols": [
+                "FFFFFFFF"
+              ],
+              "ctype": 2,
+              "drying_temp": "55",
+              "drying_time": "8",
+              "id": "0",
+              "nozzle_temp_max": "230",
+              "nozzle_temp_min": "190",
+              "remain": 71,
+              "state": 11,
+              "tag_uid": "0000000000000001",
+              "total_len": 330000,
+              "tray_color": "FFFFFFFF",
+              "tray_diameter": "1.75",
+              "tray_id_name": "A01-W02",
+              "tray_info_idx": "GFA01",
+              "tray_sub_brands": "PLA Matte",
+              "tray_type": "PLA",
+              "tray_uuid": "00000000000000000000000000000001",
+              "tray_weight": "1000",
+              "xcam_info": "D007D007E803E8030000803F"
+            },
+            {
+              "bed_temp": "0",
+              "bed_temp_type": "0",
+              "cali_idx": -1,
+              "cols": [
+                "FFFFFFFF"
+              ],
+              "ctype": 2,
+              "drying_temp": "55",
+              "drying_time": "8",
+              "id": "1",
+              "nozzle_temp_max": "230",
+              "nozzle_temp_min": "190",
+              "remain": 19,
+              "state": 11,
+              "tag_uid": "0000000000000002",
+              "total_len": 330000,
+              "tray_color": "FFFFFFFF",
+              "tray_diameter": "1.75",
+              "tray_id_name": "A00-W1",
+              "tray_info_idx": "GFA00",
+              "tray_sub_brands": "PLA Basic",
+              "tray_type": "PLA",
+              "tray_uuid": "00000000000000000000000000000002",
+              "tray_weight": "1000",
+              "xcam_info": "000000000000000000000000"
+            },
+            {
+              "bed_temp": "0",
+              "bed_temp_type": "0",
+              "cali_idx": -1,
+              "cols": [
+                "D1D3D5FF"
+              ],
+              "ctype": 2,
+              "drying_temp": "55",
+              "drying_time": "8",
+              "id": "2",
+              "nozzle_temp_max": "230",
+              "nozzle_temp_min": "190",
+              "remain": 31,
+              "state": 11,
+              "tag_uid": "0000000000000003",
+              "total_len": 330000,
+              "tray_color": "D1D3D5FF",
+              "tray_diameter": "1.75",
+              "tray_id_name": "A00-D2",
+              "tray_info_idx": "GFA00",
+              "tray_sub_brands": "PLA Basic",
+              "tray_type": "PLA",
+              "tray_uuid": "00000000000000000000000000000003",
+              "tray_weight": "1000",
+              "xcam_info": "803E803E8403E8030000803F"
+            },
+            {
+              "bed_temp": "0",
+              "bed_temp_type": "0",
+              "cali_idx": -1,
+              "cols": [
+                "000000FF"
+              ],
+              "ctype": 2,
+              "drying_temp": "55",
+              "drying_time": "8",
+              "id": "3",
+              "nozzle_temp_max": "230",
+              "nozzle_temp_min": "190",
+              "remain": 84,
+              "state": 11,
+              "tag_uid": "0000000000000004",
+              "total_len": 330000,
+              "tray_color": "000000FF",
+              "tray_diameter": "1.75",
+              "tray_id_name": "A00-K0",
+              "tray_info_idx": "GFA00",
+              "tray_sub_brands": "PLA Basic",
+              "tray_type": "PLA",
+              "tray_uuid": "00000000000000000000000000000004",
+              "tray_weight": "1000",
+              "xcam_info": "803E803EE803E803CDCC4C3F"
+            }
+          ]
+        }
+      ],
+      "ams_exist_bits": "1",
+      "ams_exist_bits_raw": "1",
+      "cali_id": 255,
+      "cali_stat": 0,
+      "cfs": [
+        2,
+        3,
+        4
+      ],
+      "insert_flag": true,
+      "power_on_flag": false,
+      "tray_exist_bits": "f",
+      "tray_hall_out_bits": "0",
+      "tray_is_bbl_bits": "f",
+      "tray_now": "255",
+      "tray_pre": "255",
+      "tray_read_done_bits": "f",
+      "tray_reading_bits": "0",
+      "tray_tar": "255",
+      "unbind_ams_stat": 0,
+      "version": 50468
+    },
+    "device": {
+      "airduct": {
+        "modeCur": 0,
+        "modeFunc": 0,
+        "modeList": [
+          {
+            "ctrl": [
+              16,
+              32,
+              160,
+              48
+            ],
+            "modeId": 0,
+            "off": []
+          },
+          {
+            "ctrl": [
+              16,
+              32,
+              48
+            ],
+            "modeId": 1,
+            "off": [
+              160
+            ]
+          }
+        ],
+        "modeVisable": 7,
+        "parts": [
+          {
+            "func": 0,
+            "id": 16,
+            "range": 6553600,
+            "state": 0,
+            "tar_state": 0
+          },
+          {
+            "func": 6,
+            "id": 32,
+            "range": 6553600,
+            "state": 0,
+            "tar_state": 0
+          }
+        ],
+        "subFunc": 0,
+        "subMode": 0,
+        "subVisable": 7,
+        "version": 1
+      },
+      "aps": {},
+      "bed": {
+        "info": {
+          "temp": 12
+        },
+        "state": 0
+      },
+      "bed_temp": 12,
+      "cam": {
+        "laser": {
+          "cond": 253,
+          "state": 0
+        },
+        "timelapse_path": "",
+        "tl_external_free_kb": 15330112,
+        "tl_external_total_kb": 60074752,
+        "tl_internal_free_kb": 962560,
+        "tl_internal_total_kb": 962560
+      },
+      "ctc": {
+        "info": {
+          "temp": 18
+        },
+        "state": 0
+      },
+      "ext_tool": {
+        "calib": 2,
+        "low_prec": true,
+        "mount": 0,
+        "mount_3d": 0,
+        "th_temp": 0,
+        "type": ""
+      },
+      "extruder": {
+        "info": [
+          {
+            "filam_bak": [],
+            "hnow": 0,
+            "hpre": 0,
+            "htar": 0,
+            "id": 0,
+            "info": 1032,
+            "snow": 65535,
+            "spre": 65535,
+            "star": 65535,
+            "stat": 0,
+            "temp": 15,
+            "z_bias": 0.0
+          }
+        ],
+        "state": 1
+      },
+      "fan": 0,
+      "fourth_axis": {
+        "connect_flag": 0,
+        "theta_pitch": -1
+      },
+      "holder": null,
+      "laser": {
+        "power": 0
+      },
+      "nozzle": {
+        "exist": 1,
+        "info": [
+          {
+            "color_m": "00000000",
+            "diameter": 0.4,
+            "fila_id": "",
+            "id": 0,
+            "p_t": 0,
+            "sn": "N/A",
+            "stat": 0,
+            "tm": 0,
+            "type": "HS01",
+            "wear": 0.0
+          }
+        ],
+        "src_id": 0,
+        "state": 0,
+        "tar_id": 0
+      },
+      "plate": {
+        "base": 0,
+        "cali2d_id": "",
+        "cur_id": "00000",
+        "mat": 0,
+        "tar_id": ""
+      },
+      "toolhead": {
+        "pos_reference": 0,
+        "pos_x": 0.05570000037550926,
+        "pos_y": 0.2707500159740448,
+        "pos_z": 0.11879999190568924
+      },
+      "type": 1
+    },
+    "gcode_state": "FINISH",
+    "nozzle_diameter": "0.4",
+    "nozzle_target_temper": 0.0,
+    "nozzle_temper": 15.0,
+    "nozzle_type": "HS01",
+    "stg_cur": -1,
+    "vir_slot": [
+      {
+        "bed_temp": "0",
+        "bed_temp_type": "0",
+        "cali_idx": -1,
+        "cols": [
+          "FFFFFFFF"
+        ],
+        "ctype": 2,
+        "drying_temp": "0",
+        "drying_time": "0",
+        "id": "255",
+        "nozzle_temp_max": "240",
+        "nozzle_temp_min": "190",
+        "remain": 0,
+        "tag_uid": "0000000000000000",
+        "total_len": 330000,
+        "tray_color": "FFFFFFFF",
+        "tray_diameter": "1.75",
+        "tray_id_name": "",
+        "tray_info_idx": "GFA00",
+        "tray_sub_brands": "",
+        "tray_type": "PLA",
+        "tray_uuid": "00000000000000000000000000000000",
+        "tray_weight": "0",
+        "xcam_info": "000000000000000000000000"
+      }
+    ]
+  }
+}
