@@ -83,6 +83,10 @@ docs/_build/
 # pyenv
 .python-version
 
+# Host and access code of a printer, for the command
+.env
+.env.*
+
 # virtualenv
 .venv
 venv/
