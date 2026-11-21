@@ -514,9 +514,13 @@ def test_ams() -> None:
         ),
         Ams(id=1),
     )
-    # Nothing tells what remains of a spool without a tag.
-    assert state.external_spool == Filament(type="TPU", color="00112233")
-    assert not state.external_spool_active
+    assert state.external_spools == (
+        ExternalSpool(
+            extruder=ExtruderPosition.RIGHT,
+            # Nothing tells what remains of a spool without a tag.
+            filament=Filament(type="TPU", color="00112233"),
+        ),
+    )
 
 
 @pytest.mark.parametrize(
@@ -549,14 +553,15 @@ def test_active_tray(
                     {"id": "128", "tray": trays[:1]},
                 ],
                 "tray_now": tray_now,
-            }
+            },
+            "vt_tray": {"id": "254", "tray_type": "PLA"},
         }
     )
 
     assert {
         (unit.id, tray.id) for unit in state.ams for tray in unit.trays if tray.active
     } == active
-    assert state.external_spool_active is external_spool_active
+    assert [spool.active for spool in state.external_spools] == [external_spool_active]
 
 
 @pytest.mark.parametrize(
@@ -568,7 +573,7 @@ def test_no_ams(report: dict[str, Any]) -> None:
     state = PrinterState.from_report(report)
 
     assert state.ams == ()  # pylint: disable=use-implicit-booleaness-not-comparison
-    assert state.external_spool is None
+    assert state.external_spools == ()  # pylint: disable=use-implicit-booleaness-not-comparison
 
 
 @pytest.mark.parametrize(
@@ -635,7 +640,7 @@ def test_filament_color(color: Any, expected: str | None) -> None:
         {"vt_tray": {"tray_type": "PLA", "tray_color": color}}
     )
 
-    assert state.external_spool == Filament(type="PLA", color=expected)
+    assert state.external_spools[0].filament == Filament(type="PLA", color=expected)
 
 
 H2C_NOZZLE = Nozzle(
@@ -687,7 +692,6 @@ def test_extruders_of_a_printer_with_a_nozzle_rack() -> None:
         ExternalSpool(extruder=ExtruderPosition.RIGHT),
         ExternalSpool(extruder=ExtruderPosition.LEFT),
     )
-    assert state.external_spool is None
     # Each unit can feed both extruders, through the filament switch.
     assert [
         (unit.id, unit.model, unit.extruder, len(unit.trays)) for unit in state.ams
@@ -721,7 +725,6 @@ def test_extruder_of_a_printer_without_a_nozzle_rack() -> None:
     assert state.external_spools == (
         ExternalSpool(extruder=ExtruderPosition.RIGHT, filament=filament),
     )
-    assert state.external_spool == filament
     assert [(unit.model, unit.extruder) for unit in state.ams] == [
         (AmsModel.AMS_2_PRO, ExtruderPosition.RIGHT)
     ]
@@ -869,7 +872,6 @@ def test_active_tray_of_a_printer_with_two_extruders() -> None:
     assert {
         (unit.id, tray.id) for unit in state.ams for tray in unit.trays if tray.active
     } == {(1, 3)}
-    assert not state.external_spool_active
 
 
 def test_active_external_spool() -> None:
@@ -897,8 +899,6 @@ def test_active_external_spool() -> None:
             extruder=ExtruderPosition.LEFT, filament=Filament(type="PETG"), active=True
         ),
     )
-    assert state.external_spool == Filament(type="PLA")
-    assert state.external_spool_active
 
 
 def _rack_report(nozzle: Any, holder: Any = None) -> dict[str, Any]:
@@ -1085,4 +1085,6 @@ def test_remaining_of_an_external_spool(
     spool = {"id": "255", "tray_type": "PLA", **tray}
     state = PrinterState.from_report({key: spool if key == "vt_tray" else [spool]})
 
-    assert state.external_spool == Filament(type="PLA", remaining=remaining)
+    assert state.external_spools[0].filament == Filament(
+        type="PLA", remaining=remaining
+    )

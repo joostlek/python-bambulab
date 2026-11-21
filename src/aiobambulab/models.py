@@ -921,7 +921,6 @@ class PrinterState:
 
     A printer has one or two extruders, each with its temperature and its
     nozzle. The nozzle rack has no slots on a printer without one.
-    `external_spool` is the filament of the first of the external spools.
     """
 
     print_state: PrintState | None = None
@@ -950,8 +949,6 @@ class PrinterState:
     nozzle_rack: tuple[RackSlot, ...] = ()
     ams: tuple[Ams, ...] = ()
     external_spools: tuple[ExternalSpool, ...] = ()
-    external_spool: Filament | None = None
-    external_spool_active: bool = False
     sd_card_present: bool | None = None
     timelapse_enabled: bool | None = None
     recording_enabled: bool | None = None
@@ -972,7 +969,6 @@ class PrinterState:
             (extruder.filament_source for extruder in extruders if extruder.active),
             _legacy_filament_source(report) if not extruders else None,
         )
-        external_spools = _external_spools(report, active)
         return cls(
             print_state=print_state,
             job_name=_as_text(report.get("subtask_name")),
@@ -1001,11 +997,7 @@ class PrinterState:
             extruders=extruders,
             nozzle_rack=_nozzle_rack(report, nozzles),
             ams=_ams(report, active),
-            external_spools=external_spools,
-            external_spool=(external_spools[0].filament if external_spools else None),
-            external_spool_active=(
-                active is not None and active.external_spool is not None
-            ),
+            external_spools=_external_spools(report, active),
             sd_card_present=sd_card if isinstance(sd_card, bool) else None,
             timelapse_enabled=_camera_setting(report, "timelapse"),
             recording_enabled=_camera_setting(report, "ipcam_record"),
