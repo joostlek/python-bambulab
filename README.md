@@ -196,12 +196,11 @@ It reads `BAMBULAB_HOST`, `BAMBULAB_SERIAL`, and `BAMBULAB_ACCESS_CODE` from the
 ```bash
 aiobambulab show
 aiobambulab show --watch
-aiobambulab unmapped
 aiobambulab dump -o printer.json
 aiobambulab show --file printer.json
 ```
 
-`show` prints the printer, its extruders and their nozzles, the nozzle rack, the AMS units, and the external spools. `unmapped` lists what the printer reports that the library does not read. `dump` writes what the printer reports as JSON, with serial numbers and the ids of spools replaced, so that it can be shared. It keeps the names of print jobs. Every command also takes `--file` to read such a file instead of asking a printer.
+`show` prints the printer, its extruders and their nozzles, the nozzle rack, the AMS units, and the external spools. With `--watch` it keeps doing that as the printer changes. `dump` writes what the printer reports as JSON, with serial numbers and the ids of spools replaced, so that it can be shared. It keeps the names of print jobs. Both take `--file` to read such a file instead of asking a printer.
 
 ## What is not in this library
 

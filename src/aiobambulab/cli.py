@@ -29,7 +29,6 @@ from .models import (
     FilamentSource,
     Nozzle,
     PrinterInfo,
-    PrinterModel,
     PrinterState,
     RackSlot,
 )
@@ -49,7 +48,6 @@ except ImportError as err:  # pragma: no cover
     raise SystemExit(_NEEDS_MORE) from err
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
     from datetime import timedelta
 
     from rich.console import RenderableType
@@ -57,9 +55,6 @@ if TYPE_CHECKING:
 ENV_HOST: Final = "BAMBULAB_HOST"
 ENV_SERIAL: Final = "BAMBULAB_SERIAL"
 ENV_ACCESS_CODE: Final = "BAMBULAB_ACCESS_CODE"
-
-# What a status message has that is not about the printer.
-_ENVELOPE: Final = frozenset({"command", "msg", "sequence_id"})
 
 # The values that tell one printer, nozzle or spool from every other.
 _IDENTIFIERS: Final = frozenset({"sn", "tag_uid", "tray_uuid"})
@@ -133,7 +128,7 @@ def _credentials(env_file: Path) -> tuple[str, str, str]:
     return values[ENV_HOST], values[ENV_SERIAL], values[ENV_ACCESS_CODE]
 
 
-def _load(path: Path, model: PrinterModel | None) -> _Snapshot:
+def _load(path: Path) -> _Snapshot:
     """Return what a printer reported, from a file.
 
     The file holds a status message, optionally next to a version message, or
@@ -153,76 +148,12 @@ def _load(path: Path, model: PrinterModel | None) -> _Snapshot:
     if not isinstance(modules, list):
         modules = []
     info = PrinterInfo.from_modules("", modules)
-    if info.model is None and model is not None:
-        info = dataclasses.replace(info, model=model, model_name=model.value)
     return _Snapshot(
         info=info,
         state=PrinterState.from_report(report, info.model),
         modules=modules,
         report=report,
     )
-
-
-class _Tracked(dict[str, Any]):
-    """Part of a report that remembers which of its values were asked for."""
-
-    def __init__(self, data: dict[str, Any], path: str, read: set[str]) -> None:
-        """Initialize the part, and the parts in it."""
-        super().__init__(
-            {key: _track(value, f"{path}{key}", read) for key, value in data.items()}
-        )
-        self._path = path
-        self._read = read
-
-    def __getitem__(self, key: str) -> Any:
-        """Return a value, and remember that it was asked for."""
-        self._read.add(f"{self._path}{key}")
-        return super().__getitem__(key)
-
-    def __contains__(self, key: object) -> bool:
-        """Return whether there is a value, and remember that it was asked for."""
-        self._read.add(f"{self._path}{key}")
-        return super().__contains__(key)
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """Return a value, and remember that it was asked for."""
-        self._read.add(f"{self._path}{key}")
-        return super().get(key, default)
-
-
-def _track(value: Any, path: str, read: set[str]) -> Any:
-    """Return a value of a report that remembers what is asked of it."""
-    if isinstance(value, dict):
-        return _Tracked(value, f"{path}.", read)
-    if isinstance(value, list):
-        return [_track(item, f"{path}[]", read) for item in value]
-    return value
-
-
-def _values(value: Any, path: str) -> Iterator[tuple[str, Any]]:
-    """Yield the values in a report, each with the path to it."""
-    if isinstance(value, dict) and value:
-        for key, item in value.items():
-            yield from _values(item, f"{path}.{key}" if path else key)
-    elif isinstance(value, list) and any(isinstance(item, dict) for item in value):
-        for item in value:
-            yield from _values(item, f"{path}[]")
-    else:
-        yield path, value
-
-
-def _unmapped(snapshot: _Snapshot) -> dict[str, Any]:
-    """Return what the printer reported that the library does not read.
-
-    Each path comes with one of the values that the printer reported there.
-    """
-    read: set[str] = set()
-    PrinterState.from_report(_Tracked(snapshot.report, "", read), snapshot.info.model)
-    unmapped: dict[str, Any] = {}
-    for path, value in _values(snapshot.report, ""):
-        if path not in read and path not in _ENVELOPE:
-            unmapped.setdefault(path, value)
-    return unmapped
 
 
 def _masked(snapshot: _Snapshot, serial: str) -> dict[str, Any]:
@@ -453,22 +384,18 @@ def _external_spools_table(spools: tuple[ExternalSpool, ...]) -> Table:
 def _printer_values(snapshot: _Snapshot) -> Group:
     """Return what the printer reports that is one value, in a few columns."""
     info = snapshot.info
-    values: list[tuple[str, Text | str]] = [("model", info.model_name or "unknown")]
+    values = [("model", info.model_name or "unknown")]
     values.extend(
         (name, str(value))
         for name in ("firmware_version", "hardware_version")
         if (value := getattr(info, name)) is not None
     )
-    for field in dataclasses.fields(snapshot.state):
-        value = getattr(snapshot.state, field.name)
-        if field.name in _PARTS or value is None:
-            continue
-        values.append(
-            (
-                field.name,
-                _filament(value) if isinstance(value, Filament) else str(value),
-            )
-        )
+    values.extend(
+        (field.name, str(value))
+        for field in dataclasses.fields(snapshot.state)
+        if field.name not in _PARTS
+        and (value := getattr(snapshot.state, field.name)) is not None
+    )
     values.extend(
         ("error", f"{error.code} ({error.severity or 'unknown'})")
         for error in snapshot.state.errors
@@ -523,22 +450,6 @@ def _view(snapshot: _Snapshot) -> RenderableType:
     return Group(*parts)
 
 
-def _unmapped_view(snapshot: _Snapshot) -> RenderableType:
-    """Return what the library does not read of a printer, to show."""
-    unmapped = _unmapped(snapshot)
-    if not unmapped:
-        return Text("The library reads everything the printer reported.")
-    table = _table(
-        f"{len(unmapped)} values the library does not read", "Path", "Reported"
-    )
-    table.columns[1].overflow = "ellipsis"
-    table.columns[1].no_wrap = True
-    table.columns[1].max_width = 60
-    for path, value in sorted(unmapped.items()):
-        table.add_row(path, json.dumps(value))
-    return table
-
-
 async def _watch(client: _RecordingClient, console: Console) -> None:
     """Show a printer, and what changes, until interrupted."""
     changed = asyncio.Event()
@@ -560,7 +471,7 @@ async def _run(args: argparse.Namespace, console: Console) -> int:
     """Run the command, and return its exit code."""
     serial = ""
     if args.file is not None:
-        snapshot = _load(args.file, args.model)
+        snapshot = _load(args.file)
     else:
         host, serial, access_code = _credentials(args.env_file)
         try:
@@ -577,8 +488,6 @@ async def _run(args: argparse.Namespace, console: Console) -> int:
             console.file.write(f"{text}\n")
         else:
             args.output.write_text(f"{text}\n")
-    elif args.command == "unmapped":
-        console.print(_unmapped_view(snapshot))
     else:
         console.print(_view(snapshot))
     return 0
@@ -591,12 +500,6 @@ def _parser() -> argparse.ArgumentParser:
         "--file",
         type=Path,
         help="read what a printer reported from a file, like one that dump wrote",
-    )
-    source.add_argument(
-        "--model",
-        type=PrinterModel,
-        choices=list(PrinterModel),
-        help="the model of the printer, for a file that does not tell",
     )
     source.add_argument(
         "--env-file",
@@ -621,11 +524,6 @@ def _parser() -> argparse.ArgumentParser:
     )
     show.add_argument(
         "--watch", action="store_true", help="keep showing the printer as it changes"
-    )
-    commands.add_parser(
-        "unmapped",
-        parents=[source],
-        help="show what the printer reports that the library does not read",
     )
     dump = commands.add_parser(
         "dump",

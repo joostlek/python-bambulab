@@ -78,7 +78,7 @@ def test_show_a_printer_with_a_nozzle_rack(capsys: pytest.CaptureFixture[str]) -
     """The command shows the extruders, the rack, the AMS units and the spools."""
     file = str(FIXTURES / "h2c_status.json")
 
-    assert cli.main(["show", "--file", file, "--model", "H2C"]) == 0
+    assert cli.main(["show", "--file", file]) == 0
 
     output = capsys.readouterr().out
     # Tables that fit are next to each other.
@@ -86,7 +86,8 @@ def test_show_a_printer_with_a_nozzle_rack(capsys: pytest.CaptureFixture[str]) -
         "Extruders" in line and "Nozzle rack" in line for line in output.splitlines()
     )
     words = _words(output)
-    assert "model H2C" in words
+    # The file does not tell what the printer is.
+    assert "model unknown" in words
     assert "External spools" in words
     assert "right active 27 °C 0.4 mm HS01 20D00A000000001 nothing loaded" in words
     assert "left 23 °C 0.4 mm HS01 - nothing loaded" in words
@@ -122,7 +123,8 @@ async def test_show_what_an_extruder_is_loaded_from(tmp_path: Path) -> None:
     assert "0 AMS 2 Pro - 34 %, index 3 22.2 °C 90 min left" in words
     assert "error 0300_0100_0001_0007 (fatal)" in words
     assert words.count("1 empty - - -") == 1
-    assert output.count("active") == 3
+    # The left extruder, and its external spool.
+    assert output.count("active") == 2
 
 
 async def test_show_a_printer_that_only_reports_its_nozzle(tmp_path: Path) -> None:
@@ -189,31 +191,6 @@ def test_file_that_is_not_a_report(tmp_path: Path, content: str) -> None:
 
     with pytest.raises(SystemExit, match=r"report\.json"):
         cli.main(["show", "--file", str(file)])
-
-
-def test_unmapped(capsys: pytest.CaptureFixture[str]) -> None:
-    """The command lists what the printer reports that the library skips."""
-    file = str(FIXTURES / "h2c_status.json")
-
-    assert cli.main(["unmapped", "--file", file]) == 0
-
-    output = capsys.readouterr().out
-    assert "values the library does not read" in output
-    assert "device.holder.pos" in output
-    assert "ams.ams[].tray[].tray_uuid" in output
-    assert "device.nozzle.info[].wear" in output
-    for path in ("device.nozzle.exist", "device.extruder.info[].snow", "command"):
-        assert f" {path} " not in output
-
-
-def test_nothing_unmapped(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """The command tells when the library reads everything."""
-    file = tmp_path / "report.json"
-    file.write_text(json.dumps({"print": {"nozzle_temper": 20, "ipcam": {}}}))
-
-    assert cli.main(["unmapped", "--file", str(file)]) == 0
-
-    assert "reads everything" in capsys.readouterr().out
 
 
 def test_dump_replaces_what_identifies(tmp_path: Path) -> None:
