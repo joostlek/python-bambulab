@@ -531,6 +531,8 @@ def test_ams() -> None:
         ("4", {(1, 0)}, False),
         ("6", {(1, 2)}, False),
         ("128", {(128, 0)}, False),
+        ("135", set(), False),
+        ("136", set(), False),
         ("254", set(), True),
         ("255", set(), False),
         ("none", set(), False),
@@ -794,6 +796,45 @@ def test_extruders_that_only_report_their_temperature() -> None:
                 ),
             ),
         ),
+        (
+            # What is left out of the extruder that prints is told elsewhere.
+            {
+                "nozzle_temper": 210,
+                "nozzle_target_temper": 220,
+                "nozzle_diameter": "0.4",
+                "nozzle_type": "HS01",
+                "device": {"extruder": {"info": [{"id": 1}, {"id": 0}], "state": 2}},
+            },
+            (
+                Extruder(
+                    position=ExtruderPosition.RIGHT,
+                    temperature=210,
+                    target_temperature=220,
+                    active=True,
+                    nozzle=Nozzle(diameter=0.4, type="HS01"),
+                ),
+                Extruder(position=ExtruderPosition.LEFT),
+            ),
+        ),
+        (
+            {
+                "nozzle_temper": 210,
+                "nozzle_diameter": "0.4",
+                "device": {
+                    "extruder": {"info": [{"id": 0, "temp": 25}], "state": 1},
+                    "nozzle": {"info": [{"id": 0, "diameter": 0.6}]},
+                },
+            },
+            (
+                Extruder(
+                    position=ExtruderPosition.RIGHT,
+                    temperature=25,
+                    target_temperature=0,
+                    active=True,
+                    nozzle=Nozzle(diameter=0.6),
+                ),
+            ),
+        ),
         ({"nozzle_temper": "hot", "device": {"extruder": {"info": "none"}}}, ()),
         ({"device": {"extruder": {"info": [{"id": 7, "temp": 20}, "broken"]}}}, ()),
         (
@@ -958,6 +999,11 @@ def _rack_report(nozzle: Any, holder: Any = None) -> dict[str, Any]:
             ),
             ["docked"] * 3 + ["empty"] + ["docked"] * 5,
         ),
+        (
+            # A rack does not have more slots than there are ids for them.
+            _rack_report({"info": [{"id": 32, "sn": "B"}, {"id": 200000, "sn": "C"}]}),
+            [],
+        ),
         (_rack_report({"exist": 1, "info": [{"id": 0}], "tar_id": 0}), []),
         (_rack_report("none"), []),
         ({"device": {"nozzle": {"info": "none"}}}, []),
@@ -989,6 +1035,7 @@ def test_nozzle_rack(report: dict[str, Any], states: list[str]) -> None:
             Nozzle(serial="20D00A000000009", print_time=timedelta()),
         ),
         ({"sn": "20D00A000000009", "p_t": -1}, Nozzle(serial="20D00A000000009")),
+        ({"sn": "20D00A000000009", "p_t": 1e19}, Nozzle(serial="20D00A000000009")),
         ({"diameter": 0, "type": "", "sn": "N/A", "p_t": 0}, Nozzle()),
         ({"sn": "N/A", "p_t": 500}, Nozzle()),
     ],
@@ -1088,3 +1135,61 @@ def test_remaining_of_an_external_spool(
     assert state.external_spools[0].filament == Filament(
         type="PLA", remaining=remaining
     )
+
+
+@pytest.mark.parametrize(
+    ("report", "spools"),
+    [
+        (
+            # Newer firmware reports the spools in a list, which can be empty.
+            {"vir_slot": [], "vt_tray": {"id": "254", "tray_type": "PLA"}},
+            (
+                ExternalSpool(
+                    extruder=ExtruderPosition.RIGHT, filament=Filament(type="PLA")
+                ),
+            ),
+        ),
+        (
+            {
+                "vir_slot": [{"id": "255", "tray_type": "PETG"}],
+                "vt_tray": {"id": "254", "tray_type": "PLA"},
+            },
+            (
+                ExternalSpool(
+                    extruder=ExtruderPosition.RIGHT, filament=Filament(type="PETG")
+                ),
+            ),
+        ),
+        (
+            # The only spool of a printer with one extruder, whatever its id.
+            {
+                "nozzle_temper": 210,
+                "ams": {"tray_now": "254"},
+                "vir_slot": [{"id": "254", "tray_type": "PLA"}],
+            },
+            (
+                ExternalSpool(
+                    extruder=ExtruderPosition.RIGHT,
+                    filament=Filament(type="PLA"),
+                    active=True,
+                ),
+            ),
+        ),
+        (
+            {
+                "vir_slot": [{"id": "254", "tray_type": "PLA"}],
+                "device": {"extruder": {"info": [{"id": 0}, {"id": 1}], "state": 2}},
+            },
+            (
+                ExternalSpool(
+                    extruder=ExtruderPosition.LEFT, filament=Filament(type="PLA")
+                ),
+            ),
+        ),
+    ],
+)
+def test_external_spools(
+    report: dict[str, Any], spools: tuple[ExternalSpool, ...]
+) -> None:
+    """A printer reports its external spools in one of two ways."""
+    assert PrinterState.from_report(report).external_spools == spools

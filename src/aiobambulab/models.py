@@ -162,6 +162,7 @@ _MAX_FAN_LEVEL: Final = 15
 _EXTERNAL_SPOOL: Final = 254
 # An AMS with one tray has an id from this number on, and is the tray itself.
 _FIRST_SINGLE_TRAY_AMS: Final = 128
+_LAST_SINGLE_TRAY_AMS: Final = 135
 _TRAYS_PER_AMS: Final = 4
 
 # A printer with one external spool reports it with the first id. A printer
@@ -178,6 +179,7 @@ _EXTRUDER_POSITIONS: Final = {0: ExtruderPosition.RIGHT, 1: ExtruderPosition.LEF
 # A nozzle has the id of where it is: an extruder, or from this id on a slot
 # of the nozzle rack.
 _FIRST_RACK_SLOT: Final = 16
+_LAST_RACK_SLOT: Final = 31
 _RACK_SLOTS: Final = 6
 
 # The kind of an AMS, as the last digit of what it reports about itself.
@@ -571,6 +573,8 @@ def _legacy_filament_source(report: dict[str, Any]) -> FilamentSource | None:
         return None
     if tray == _EXTERNAL_SPOOL:
         return FilamentSource(external_spool=ExtruderPosition.RIGHT)
+    if tray > _LAST_SINGLE_TRAY_AMS:
+        return None
     if tray >= _FIRST_SINGLE_TRAY_AMS:
         return FilamentSource(ams_id=tray, tray_id=0)
     ams_id, tray_id = divmod(tray, _TRAYS_PER_AMS)
@@ -592,21 +596,27 @@ def _filament_source(value: Any) -> FilamentSource | None:
     return FilamentSource(ams_id=ams_id, tray_id=tray_id)
 
 
+def _print_time(value: Any) -> timedelta | None:
+    """Return the time a nozzle printed for, which a printer reports in seconds."""
+    seconds = _as_int(value)
+    if seconds is None or seconds < 0:
+        return None
+    try:
+        return timedelta(seconds=seconds)
+    except OverflowError:
+        return None
+
+
 def _nozzle(entry: dict[str, Any]) -> Nozzle:
     """Return a nozzle the printer reports."""
     serial = _as_text(entry.get("sn"))
     if serial == "N/A":
         serial = None
-    seconds = _as_int(entry.get("p_t"))
     return Nozzle(
         diameter=_as_float(entry.get("diameter")) or None,
         type=_as_text(entry.get("type")),
         serial=serial,
-        print_time=(
-            timedelta(seconds=seconds)
-            if serial is not None and seconds is not None and seconds >= 0
-            else None
-        ),
+        print_time=None if serial is None else _print_time(entry.get("p_t")),
     )
 
 
@@ -618,7 +628,7 @@ def _nozzles(report: dict[str, Any]) -> dict[int, Nozzle]:
     nozzles = {}
     for entry in _entries(block.get("info")):
         place = _as_int(entry.get("id"))
-        if place is None or place < 0:
+        if place is None or not 0 <= place <= _LAST_RACK_SLOT:
             continue
         if present is not None and not present >> place & 1:
             continue
@@ -676,18 +686,28 @@ def _extruders(
         if temperature is not None and temperature < 0:
             temperature = None
         nozzle_id = _as_int(entry.get("hnow"))
-        extruders.append(
-            Extruder(
-                position=_EXTRUDER_POSITIONS[extruder_id],
-                temperature=None if temperature is None else temperature & 0xFFFF,
-                target_temperature=(
-                    None if temperature is None else temperature >> 16 & 0xFFFF
-                ),
-                active=extruder_id == active,
-                nozzle=nozzles.get(extruder_id if nozzle_id is None else nozzle_id),
-                filament_source=_filament_source(entry.get("snow")),
-            )
+        extruder = Extruder(
+            position=_EXTRUDER_POSITIONS[extruder_id],
+            temperature=None if temperature is None else temperature & 0xFFFF,
+            target_temperature=(
+                None if temperature is None else temperature >> 16 & 0xFFFF
+            ),
+            active=extruder_id == active,
+            nozzle=nozzles.get(extruder_id if nozzle_id is None else nozzle_id),
+            filament_source=_filament_source(entry.get("snow")),
         )
+        if extruder.active and (legacy := _legacy_extruder(report)):
+            # What the printer also reports about the extruder that prints,
+            # for what it leaves out here.
+            if temperature is None:
+                extruder = replace(
+                    extruder,
+                    temperature=legacy[0].temperature,
+                    target_temperature=legacy[0].target_temperature,
+                )
+            if extruder.nozzle is None:
+                extruder = replace(extruder, nozzle=legacy[0].nozzle)
+        extruders.append(extruder)
     return tuple(extruders)
 
 
@@ -776,17 +796,20 @@ def _external_filament(tray: dict[str, Any]) -> Filament | None:
 
 
 def _external_spools(
-    report: dict[str, Any], active: FilamentSource | None
+    report: dict[str, Any], active: FilamentSource | None, extruders: int
 ) -> tuple[ExternalSpool, ...]:
     """Return the external spools of the printer, the right one first."""
-    filaments = {}
-    if isinstance(slots := report.get("vir_slot"), list):
-        for slot in _entries(slots):
-            if (spool_id := _as_int(slot.get("id"))) in _EXTERNAL_SPOOLS:
-                filaments[_EXTERNAL_SPOOLS[spool_id]] = _external_filament(slot)
-    elif isinstance(tray := report.get("vt_tray"), dict):
+    filaments = {
+        _EXTERNAL_SPOOLS[spool_id]: _external_filament(slot)
+        for slot in _entries(report.get("vir_slot"))
+        if (spool_id := _as_int(slot.get("id"))) in _EXTERNAL_SPOOLS
+    }
+    if not filaments and isinstance(tray := report.get("vt_tray"), dict):
         # Older firmware only knows of one external spool.
         filaments[ExtruderPosition.RIGHT] = _external_filament(tray)
+    if extruders < 2 and len(filaments) == 1:
+        # Whatever its id, the spool of a printer with one extruder is of that one.
+        filaments = {ExtruderPosition.RIGHT: next(iter(filaments.values()))}
     return tuple(
         ExternalSpool(
             extruder=position,
@@ -964,8 +987,7 @@ class PrinterState:
         sd_card = report.get("sdcard")
         nozzles = _nozzles(report)
         extruders = _extruders(report, nozzles)
-        # Where the extruder that prints takes its filament from.
-        active = next(
+        active_source = next(
             (extruder.filament_source for extruder in extruders if extruder.active),
             _legacy_filament_source(report) if not extruders else None,
         )
@@ -996,8 +1018,8 @@ class PrinterState:
             errors=_errors(report),
             extruders=extruders,
             nozzle_rack=_nozzle_rack(report, nozzles),
-            ams=_ams(report, active),
-            external_spools=_external_spools(report, active),
+            ams=_ams(report, active_source),
+            external_spools=_external_spools(report, active_source, len(extruders)),
             sd_card_present=sd_card if isinstance(sd_card, bool) else None,
             timelapse_enabled=_camera_setting(report, "timelapse"),
             recording_enabled=_camera_setting(report, "ipcam_record"),
