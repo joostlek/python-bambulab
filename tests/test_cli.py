@@ -87,7 +87,7 @@ def test_show_a_printer_with_a_nozzle_rack(capsys: pytest.CaptureFixture[str]) -
     )
     words = _words(output)
     # The file does not tell what the printer is.
-    assert "model unknown" in words
+    assert "Model unknown" in words
     assert "External spools" in words
     assert "right active 27 °C 0.4 mm HS01 20D00A000000001 nothing loaded" in words
     assert "left 23 °C 0.4 mm HS01 - nothing loaded" in words
@@ -116,12 +116,12 @@ async def test_show_what_an_extruder_is_loaded_from(tmp_path: Path) -> None:
 
     assert code == 0
     words = _words(output)
-    assert "model unknown" in words
+    assert "Model unknown" in words
     assert "AMS 128 tray 0: Support for PLA (PLA-S)" in words
     assert "left external spool: empty" in words
     assert "23 °C, set to 220 °C" in words
     assert "0 AMS 2 Pro - 34 %, index 3 22.2 °C 90 min left" in words
-    assert "error 0300_0100_0001_0007 (fatal)" in words
+    assert "Error 0300_0100_0001_0007 (fatal)" in words
     assert words.count("1 empty - - -") == 1
     # The left extruder, and its external spool.
     assert output.count("active") == 2
@@ -137,7 +137,8 @@ async def test_show_a_printer_that_only_reports_its_nozzle(tmp_path: Path) -> No
 
     assert code == 0
     words = _words(output)
-    assert "model H2D firmware_version 01.01.01.00" in words
+    assert "Model H2D" in words
+    assert "Firmware 01.01.01.00" in words
     assert "right active 20 °C - - nothing loaded" in words
     assert "Nozzle rack" not in output
     assert "AMS" not in output
@@ -277,6 +278,9 @@ async def test_show_a_printer(live: FakePrinter) -> None:
     assert code == 0
     assert "P1S" in output
     assert "01.08.02.00" in output
+    assert "42 %, layer 96 of 240" in output
+    assert "sport, 124 %" in output
+    assert "60 °C, set to 60 °C" in output
     for secret in (SERIAL, ACCESS_CODE, "127.0.0.1"):
         assert secret not in output
     assert live.connections == 1

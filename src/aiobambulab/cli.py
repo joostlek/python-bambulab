@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import contextlib
-import dataclasses
 from dataclasses import dataclass
 import json
 import os
@@ -41,6 +40,7 @@ try:
     from rich.columns import Columns
     from rich.console import Console, Group
     from rich.live import Live
+    from rich.padding import Padding
     from rich.panel import Panel
     from rich.table import Table
     from rich.text import Text
@@ -60,10 +60,8 @@ ENV_ACCESS_CODE: Final = "BAMBULAB_ACCESS_CODE"
 _IDENTIFIERS: Final = frozenset({"sn", "tag_uid", "tray_uuid"})
 _KEPT_OF_SERIAL: Final = 3
 
-# The parts of the state that the command shows in tables of their own.
-_PARTS: Final = frozenset(
-    {"extruders", "nozzle_rack", "ams", "external_spools", "errors"}
-)
+_ON_OFF: Final[dict[bool | None, str]] = {True: "on", False: "off"}
+_YES_NO: Final[dict[bool | None, str]] = {True: "yes", False: "no"}
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -192,10 +190,10 @@ def _masked(snapshot: _Snapshot, serial: str) -> dict[str, Any]:
     }
 
 
-def _temperature(current: float | None, target: float | None) -> str:
+def _temperature(current: float | None, target: float | None) -> str | None:
     """Return a temperature as text, with what it is set to when that is on."""
     if current is None:
-        return "-"
+        return None
     return f"{current} °C" if not target else f"{current} °C, set to {target} °C"
 
 
@@ -265,6 +263,7 @@ def _table(title: str, *columns: str) -> Table:
         title_justify="left",
         title_style="bold",
         header_style="dim",
+        show_header=bool(columns),
         box=None,
         pad_edge=False,
         padding=(0, 2, 0, 0),
@@ -288,7 +287,7 @@ def _extruders_table(extruders: tuple[Extruder, ...], state: PrinterState) -> Ta
         table.add_row(
             extruder.position,
             _active(active=extruder.active),
-            _temperature(extruder.temperature, extruder.target_temperature),
+            _temperature(extruder.temperature, extruder.target_temperature) or "-",
             _nozzle(extruder.nozzle),
             (extruder.nozzle.serial if extruder.nozzle else None) or "-",
             _source(state, extruder.filament_source),
@@ -347,7 +346,7 @@ def _ams_units_table(units: tuple[Ams, ...], info: dict[int, AmsInfo]) -> Table:
             unit.model or unit_info.model or "-",
             f"{unit.extruder} extruder" if unit.extruder else "-",
             _humidity(unit),
-            _temperature(unit.temperature, None),
+            _temperature(unit.temperature, None) or "-",
             f"{drying} min left" if drying else "-",
             unit_info.serial or "-",
             unit_info.firmware_version or "-",
@@ -381,73 +380,106 @@ def _external_spools_table(spools: tuple[ExternalSpool, ...]) -> Table:
     return table
 
 
-def _printer_values(snapshot: _Snapshot) -> Group:
-    """Return what the printer reports that is one value, in a few columns."""
+def _unit(value: float | None, unit: str) -> str | None:
+    """Return a number with its unit as text, or None without a number."""
+    return None if value is None else f"{value} {unit}"
+
+
+def _join(*parts: str | None) -> str | None:
+    """Return the parts that are known as one text, or None if none is."""
+    return ", ".join(part for part in parts if part) or None
+
+
+def _facts(title: str, *facts: tuple[str, str | None]) -> Table:
+    """Return a table of what is known, each with what it is."""
+    table = _table(title)
+    for label, value in facts:
+        if value is not None:
+            table.add_row(Text(label, style="dim"), value)
+    return table
+
+
+def _summary(snapshot: _Snapshot) -> list[Table]:
+    """Return the tables of what the printer reports that is one value."""
     info = snapshot.info
-    values = [("model", info.model_name or "unknown")]
-    values.extend(
-        (name, str(value))
-        for name in ("firmware_version", "hardware_version")
-        if (value := getattr(info, name)) is not None
-    )
-    values.extend(
-        (field.name, str(value))
-        for field in dataclasses.fields(snapshot.state)
-        if field.name not in _PARTS
-        and (value := getattr(snapshot.state, field.name)) is not None
-    )
-    values.extend(
-        ("error", f"{error.code} ({error.severity or 'unknown'})")
-        for error in snapshot.state.errors
-    )
-    return Group(
-        Text("Printer", style="bold"),
-        Columns(
-            [Text.assemble((name, "dim"), " ", value) for name, value in values],
-            column_first=True,
-            padding=(0, 3),
+    state = snapshot.state
+    layer = state.current_layer
+    return [
+        _facts(
+            "Printer",
+            ("Model", info.model_name or "unknown"),
+            ("Firmware", info.firmware_version),
+            ("Update", state.available_firmware_version),
+            ("Hardware", info.hardware_version),
+            ("Wi-Fi", _unit(state.wifi_signal, "dBm")),
+            ("SD card", _YES_NO.get(state.sd_card_present)),
+            ("Commands", "accepted" if state.accepts_commands else "refused"),
+            *(
+                ("Error", f"{error.code} ({error.severity or 'unknown'})")
+                for error in state.errors
+            ),
         ),
-    )
+        _facts(
+            "Print job",
+            ("State", state.print_state),
+            ("Stage", state.stage),
+            ("Job", state.job_name),
+            (
+                "Progress",
+                _join(
+                    _unit(state.progress, "%"),
+                    None if layer is None else f"layer {layer} of {state.total_layers}",
+                ),
+            ),
+            ("Remaining", _unit(state.remaining_minutes, "min")),
+            ("Speed", _join(state.speed_profile, _unit(state.speed_percentage, "%"))),
+            ("Error", state.print_error),
+        ),
+        _facts(
+            "Chamber",
+            ("Bed", _temperature(state.bed_temperature, state.bed_target_temperature)),
+            ("Chamber", _temperature(state.chamber_temperature, None)),
+            ("Light", _ON_OFF.get(state.chamber_light_on)),
+            ("Part fan", _unit(state.part_fan_speed, "%")),
+            ("Aux fan", _unit(state.aux_fan_speed, "%")),
+            ("Chamber fan", _unit(state.chamber_fan_speed, "%")),
+            ("Heatbreak fan", _unit(state.heatbreak_fan_speed, "%")),
+        ),
+        _facts(
+            "Camera",
+            ("Stream", _ON_OFF.get(state.camera_stream_enabled)),
+            ("Timelapse", _ON_OFF.get(state.timelapse_enabled)),
+            ("Recording", _ON_OFF.get(state.recording_enabled)),
+        ),
+    ]
 
 
-def _stack(*tables: Table) -> Table:
-    """Return tables below each other, as one thing to put next to another."""
-    stack = Table.grid()
-    for index, table in enumerate(tables):
-        if index:
-            stack.add_row(Text())
-        stack.add_row(table)
-    return stack
+def _section(*tables: Table) -> Columns:
+    """Return tables of one kind next to each other, with an empty line below.
 
-
-def _row(*tables: Table) -> Columns:
-    """Return tables next to each other, as far as the screen is wide enough."""
-    return Columns(tables, padding=(0, 4, 1, 0))
+    Those that do not fit on the screen go below the others.
+    """
+    return Columns([Padding(table, (0, 0, 1, 0)) for table in tables], padding=(0, 4))
 
 
 def _view(snapshot: _Snapshot) -> RenderableType:
-    """Return what the library makes of a printer, to show.
-
-    Tables are next to each other where they fit, to keep it all on one screen.
-    """
+    """Return what the library makes of a printer, to show."""
     state = snapshot.state
-    info = {unit.id: unit for unit in snapshot.info.ams}
-    left = []
+    sections = [[table for table in _summary(snapshot) if table.row_count]]
+    toolhead = []
     if state.extruders:
-        left.append(_extruders_table(state.extruders, state))
-    if state.ams:
-        left.append(_ams_units_table(state.ams, info))
-    toolhead = [_stack(*left)] if left else []
+        toolhead.append(_extruders_table(state.extruders, state))
     if state.nozzle_rack:
         toolhead.append(_rack_table(state.nozzle_rack))
+    sections.append(toolhead)
+    if state.ams:
+        info = {unit.id: unit for unit in snapshot.info.ams}
+        sections.append([_ams_units_table(state.ams, info)])
     spools = [_trays_table(unit) for unit in state.ams]
     if state.external_spools:
         spools.append(_external_spools_table(state.external_spools))
-    parts: list[RenderableType] = [_printer_values(snapshot)]
-    for tables in (toolhead, spools):
-        if tables:
-            parts.extend((Text(), _row(*tables)))
-    return Group(*parts)
+    sections.append(spools)
+    return Group(*(_section(*tables) for tables in sections if tables))
 
 
 async def _watch(client: _RecordingClient, console: Console) -> None:
