@@ -183,6 +183,25 @@ To decide this yourself, pass your own `ssl.SSLContext` as `ssl_context`.
 
 Creating the default context reads files from disk. The client does that in an executor. To create it yourself, for example to reuse it, call `create_ssl_context(serial)` in an executor.
 
+### Command line
+
+The `aiobambulab` command shows a printer the way the library sees it. It is there to check the library against a real printer, and it only asks the printer for its version and its status.
+
+```bash
+pip install "aiobambulab[cli]"
+```
+
+It reads `BAMBULAB_HOST`, `BAMBULAB_SERIAL`, and `BAMBULAB_ACCESS_CODE` from the environment, or from a `.env` file in the current directory. `--env-file` picks another file, for a second printer.
+
+```bash
+aiobambulab show
+aiobambulab show --watch
+aiobambulab dump -o printer.json
+aiobambulab show --file printer.json
+```
+
+`show` prints the printer, its extruders and their nozzles, the nozzle rack, the AMS units, and the external spools. With `--watch` it keeps doing that as the printer changes. `dump` writes what the printer reports as JSON, with serial numbers and the ids of spools replaced, so that it can be shared. It keeps the names of print jobs. Both take `--file` to read such a file instead of asking a printer.
+
 ## What is not in this library
 
 - Anything that goes through the Bambu Lab cloud.

@@ -29,6 +29,12 @@ Documentation = "https://github.com/joostlek/python-bambulab"
 "Bug Tracker" = "https://github.com/joostlek/python-bambulab/issues"
 Changelog = "https://github.com/joostlek/python-bambulab/releases"
 
+[project.optional-dependencies]
+cli = ["rich>=13.0.0"]
+
+[project.scripts]
+aiobambulab = "aiobambulab.cli:main"
+
 [dependency-groups]
 dev = [
     "codespell==2.4.3",
@@ -42,6 +48,7 @@ dev = [
     "pytest==9.2.0",
     "pytest-asyncio==1.5.0",
     "pytest-cov==7.1.0",
+    "rich==15.0.0",
     "ruff==0.17.5",
     "safety==3.8.1",
     "yamllint==1.38.0",
